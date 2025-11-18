@@ -1,4 +1,20 @@
-# ClaudeWeb
+# ClaudeWeb Repository
+
+This repository contains two distinct projects showcasing different applications of AI and modern web development:
+
+## 📁 Projects
+
+### 1. [ClaudeWeb](/apps) - Production-Ready Chat Application
+
+A full-stack chat application powered by Claude AI with real-time WebSocket communication.
+
+### 2. [Genesis](/genesis) - Deep Procedural World Generator 🌌
+
+A sophisticated system that generates rich, internally consistent fantasy worlds with emergent complexity.
+
+---
+
+## ClaudeWeb - Chat Application
 
 A production-ready, full-stack chat application powered by Claude AI. Built with modern technologies and best practices.
 
@@ -250,6 +266,62 @@ This project is licensed under the MIT License.
 - [Next.js](https://nextjs.org) team
 - [Prisma](https://prisma.io) team
 - [shadcn/ui](https://ui.shadcn.com) for beautiful components
+
+---
+
+## Genesis - Procedural World Generator 🌌
+
+See [genesis/README.md](/genesis/README.md) for complete documentation.
+
+Genesis is a deep procedural generation system that creates fully realized fantasy worlds with:
+
+### What It Generates
+
+- **Geography**: 6 continents, oceans, climates, natural wonders, resources
+- **Cultures**: 9 distinct civilizations with governments, religions, customs, arts
+- **Languages**: Complete linguistic systems with phonology, grammar, writing
+- **History**: 1,000+ year timelines with eras, events, conflicts, alliances
+- **Mythology**: Heroes, monsters, artifacts, prophecies, creation myths, cosmology
+
+### Generated World Example: "Aetheros"
+
+- **346KB JSON data** (12,498 lines of world information)
+- **28 markdown docs** (geography, history, 9 culture profiles, 9 language guides, mythology)
+- **Seed-based**: Reproducible worlds using deterministic random generation
+
+### Sample Generated Content
+
+**Culture: Shalim** (Magocracy)
+- Sky burial death rituals
+- Polyandrous marriage
+- Scholarly pursuit & spiritual enlightenment values
+- Festivals: Feast of Ancestors, Night of Lights
+
+**Language: Altaic**
+- SOV word order, 6-case system
+- Alphabet writing (28 chars, right-to-left)
+- 4 dialects: High, Low, Court, Temple
+
+**Hero: Aeldor the Wise-soul**
+- Divine parentage
+- Slew monsters, founded city
+- Deified after death
+
+### Quick Start
+
+```bash
+cd genesis
+npm install
+npm run generate          # Generate random world
+npm run generate -- --seed=42424242  # Reproducible world
+```
+
+### Technical Highlights
+
+- **Emergent Complexity**: Simple rules create rich, coherent worlds
+- **Internal Consistency**: Geography shapes culture, culture shapes mythology
+- **Procedural Depth**: ~3,000 lines of generation code
+- **Rich Output**: 500KB of interconnected world data
 
 ---
 
