@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valiant Roofing - Shingle Visualizer</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="logo-container">
+            <img src="images/valiant-logo.png" alt="Valiant Roofing" class="logo" onerror="this.style.display='none'; document.querySelector('.logo-text').style.display='flex';">
+            <div class="logo-text" style="display: none;">
+                <span class="logo-icon">🐻</span>
+                <span>VALIANT ROOFING</span>
+            </div>
+        </div>
+        <h1 class="tagline">See Your New Roof Before You Decide</h1>
+    </header>
+
+    <main class="main-content">
+        <!-- Step 1: Upload -->
+        <section id="step-upload" class="step active">
+            <div class="step-header">
+                <span class="step-number">1</span>
+                <h2>Upload a Photo of Your Home</h2>
+            </div>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-content">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p class="upload-text">Drag & drop a photo here</p>
+                    <p class="upload-subtext">or</p>
+                    <label class="btn btn-primary">
+                        Choose File
+                        <input type="file" id="imageInput" accept="image/*" hidden>
+                    </label>
+                    <p class="upload-hint">For best results, use a clear front-facing photo of the home</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 2: Select Roof -->
+        <section id="step-select" class="step">
+            <div class="step-header">
+                <span class="step-number">2</span>
+                <h2>Select the Roof Area</h2>
+            </div>
+            <div class="toolbar">
+                <button class="tool-btn active" data-tool="draw" title="Draw Selection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                    </svg>
+                    Draw
+                </button>
+                <button class="tool-btn" data-tool="erase" title="Erase Selection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 20H7L3 16l9-9 8 8-4 4"/>
+                        <path d="M6.5 13.5L12 8"/>
+                    </svg>
+                    Erase
+                </button>
+                <div class="brush-size">
+                    <label>Brush Size:</label>
+                    <input type="range" id="brushSize" min="5" max="100" value="30">
+                    <span id="brushSizeValue">30</span>
+                </div>
+                <button class="tool-btn" id="clearSelection" title="Clear All">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"/>
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    </svg>
+                    Clear
+                </button>
+                <button class="tool-btn" id="autoDetect" title="AI Auto-Detect (Beta)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 16v-4"/>
+                        <path d="M12 8h.01"/>
+                    </svg>
+                    Auto-Detect
+                </button>
+            </div>
+            <div class="canvas-container">
+                <canvas id="mainCanvas"></canvas>
+                <canvas id="selectionCanvas"></canvas>
+                <div class="selection-hint" id="selectionHint">
+                    <p>Paint over the roof area you want to change</p>
+                </div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-secondary" id="backToUpload">Back</button>
+                <button class="btn btn-primary" id="proceedToShingles">Choose Shingles →</button>
+            </div>
+        </section>
+
+        <!-- Step 3: Choose Shingles -->
+        <section id="step-shingles" class="step">
+            <div class="step-header">
+                <span class="step-number">3</span>
+                <h2>Choose Your Shingles</h2>
+            </div>
+
+            <div class="shingle-selector">
+                <div class="product-lines">
+                    <button class="product-btn active" data-line="duration">
+                        <span class="product-name">TruDefinition® Duration®</span>
+                        <span class="product-desc">Our most popular choice</span>
+                    </button>
+                    <button class="product-btn" data-line="woodcrest">
+                        <span class="product-name">Woodcrest®</span>
+                        <span class="product-desc">Wood shake appearance</span>
+                    </button>
+                    <button class="product-btn" data-line="designer">
+                        <span class="product-name">Duration® Designer</span>
+                        <span class="product-desc">Premium designer colors</span>
+                    </button>
+                </div>
+
+                <div class="color-grid" id="colorGrid">
+                    <!-- Colors will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="preview-container">
+                <div class="preview-controls">
+                    <button class="preview-btn active" data-view="after">After</button>
+                    <button class="preview-btn" data-view="before">Before</button>
+                    <button class="preview-btn" data-view="split">Split View</button>
+                </div>
+                <div class="preview-canvas-wrapper">
+                    <canvas id="previewCanvas"></canvas>
+                    <div class="split-slider" id="splitSlider" style="display: none;">
+                        <div class="slider-line"></div>
+                        <div class="slider-handle">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5l-5 7 5 7V5zm8 0v14l5-7-5-7z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step-actions">
+                <button class="btn btn-secondary" id="backToSelect">Back</button>
+                <button class="btn btn-primary" id="saveResult">Save & Share</button>
+            </div>
+        </section>
+
+        <!-- Save/Share Modal -->
+        <div class="modal" id="saveModal">
+            <div class="modal-content">
+                <button class="modal-close" id="closeModal">&times;</button>
+                <h2>Your Roof Visualization</h2>
+                <div class="saved-image-container">
+                    <img id="savedImage" src="" alt="Roof Visualization">
+                </div>
+                <div class="customer-info">
+                    <h3>Customer Information (Optional)</h3>
+                    <input type="text" id="customerName" placeholder="Customer Name">
+                    <input type="text" id="customerAddress" placeholder="Property Address">
+                    <textarea id="customerNotes" placeholder="Notes..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" id="downloadImage">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; margin-right: 8px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download Image
+                    </button>
+                    <button class="btn btn-secondary" id="startOver">Start New Visualization</button>
+                </div>
+                <div class="branding-footer">
+                    <p>Visualization created with Valiant Roofing</p>
+                    <p class="owens-corning">Featuring Owens Corning® Roofing</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Powered by <strong>Valiant Roofing</strong> • Featuring <span class="oc-pink">Owens Corning®</span> Roofing Products</p>
+            <p class="disclaimer">Colors shown are approximations. Actual shingle colors may vary. Please request samples for accurate color matching.</p>
+        </div>
+    </footer>
+
+    <script src="js/shingles.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
