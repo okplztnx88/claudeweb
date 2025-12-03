@@ -282,7 +282,7 @@ body {
     border-color: var(--valiant-teal-dark);
 }
 
-.brush-size {
+.tool-options {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -291,18 +291,19 @@ body {
     margin-left: 0.5rem;
 }
 
-.brush-size label {
+.tool-options label {
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--gray-600);
+    white-space: nowrap;
 }
 
-.brush-size input[type="range"] {
+.tool-options input[type="range"] {
     width: 100px;
     accent-color: var(--valiant-teal);
 }
 
-.brush-size span {
+.tool-options span {
     min-width: 30px;
     text-align: center;
     font-weight: 600;
@@ -330,6 +331,10 @@ body {
     top: 0;
     left: 0;
     cursor: crosshair;
+}
+
+#selectionCanvas.fill-mode {
+    cursor: pointer;
 }
 
 .selection-hint {
@@ -727,7 +732,7 @@ body {
         align-items: stretch;
     }
 
-    .brush-size {
+    .tool-options {
         border-left: none;
         margin-left: 0;
         padding: 0.5rem 0;

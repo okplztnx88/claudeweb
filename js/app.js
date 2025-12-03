@@ -12,13 +12,15 @@
     const state = {
         currentStep: 'upload',
         originalImage: null,
+        originalImageData: null,
         imageWidth: 0,
         imageHeight: 0,
         selectionMask: null,
         selectedShingle: null,
         selectedProductLine: 'duration',
-        currentTool: 'draw',
+        currentTool: 'fill',
         brushSize: 30,
+        fillTolerance: 32,
         isDrawing: false,
         viewMode: 'after',
         splitPosition: 0.5
@@ -43,8 +45,11 @@
         selectionHint: document.getElementById('selectionHint'),
         brushSize: document.getElementById('brushSize'),
         brushSizeValue: document.getElementById('brushSizeValue'),
+        fillTolerance: document.getElementById('fillTolerance'),
+        fillToleranceValue: document.getElementById('fillToleranceValue'),
+        fillOptions: document.getElementById('fillOptions'),
+        brushOptions: document.getElementById('brushOptions'),
         clearSelection: document.getElementById('clearSelection'),
-        autoDetect: document.getElementById('autoDetect'),
 
         // Shingles
         colorGrid: document.getElementById('colorGrid'),
@@ -126,8 +131,11 @@
                 // Draw original image
                 mainCtx.drawImage(img, 0, 0, state.imageWidth, state.imageHeight);
 
+                // Store original image data for flood fill
+                state.originalImageData = mainCtx.getImageData(0, 0, state.imageWidth, state.imageHeight);
+
                 // Initialize empty selection mask
-                state.selectionMask = selectionCtx.createImageData(state.imageWidth, state.imageHeight);
+                state.selectionMask = new Uint8Array(state.imageWidth * state.imageHeight);
 
                 // Go to selection step
                 goToStep('select');
@@ -161,105 +169,216 @@
         document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tool === tool);
         });
-    }
 
-    function paintSelection(x, y) {
-        const size = state.brushSize;
-        const halfSize = size / 2;
-
-        if (state.currentTool === 'draw') {
-            // Draw selection (semi-transparent teal)
-            selectionCtx.fillStyle = 'rgba(0, 165, 168, 0.5)';
-            selectionCtx.beginPath();
-            selectionCtx.arc(x, y, halfSize, 0, Math.PI * 2);
-            selectionCtx.fill();
-
-            // Update mask
-            updateMask(x, y, size, true);
-        } else if (state.currentTool === 'erase') {
-            // Erase selection
-            selectionCtx.globalCompositeOperation = 'destination-out';
-            selectionCtx.beginPath();
-            selectionCtx.arc(x, y, halfSize, 0, Math.PI * 2);
-            selectionCtx.fill();
-            selectionCtx.globalCompositeOperation = 'source-over';
-
-            // Update mask
-            updateMask(x, y, size, false);
+        // Show/hide appropriate options
+        if (elements.fillOptions && elements.brushOptions) {
+            elements.fillOptions.style.display = tool === 'fill' ? 'flex' : 'none';
+            elements.brushOptions.style.display = (tool === 'draw' || tool === 'erase') ? 'flex' : 'none';
         }
 
-        // Hide hint after first paint
+        // Update cursor
+        elements.selectionCanvas.classList.toggle('fill-mode', tool === 'fill');
+    }
+
+    // ==========================================
+    // Flood Fill Algorithm
+    // ==========================================
+    function floodFill(startX, startY, tolerance) {
+        const width = state.imageWidth;
+        const height = state.imageHeight;
+        const imageData = state.originalImageData.data;
+
+        startX = Math.floor(startX);
+        startY = Math.floor(startY);
+
+        // Get the color at the starting point
+        const startIdx = (startY * width + startX) * 4;
+        const startR = imageData[startIdx];
+        const startG = imageData[startIdx + 1];
+        const startB = imageData[startIdx + 2];
+
+        // Create visited array
+        const visited = new Uint8Array(width * height);
+        const selected = new Uint8Array(width * height);
+
+        // Stack-based flood fill (faster than recursion)
+        const stack = [[startX, startY]];
+
+        while (stack.length > 0) {
+            const [x, y] = stack.pop();
+
+            // Bounds check
+            if (x < 0 || x >= width || y < 0 || y >= height) continue;
+
+            const pixelIdx = y * width + x;
+
+            // Already visited
+            if (visited[pixelIdx]) continue;
+            visited[pixelIdx] = 1;
+
+            // Get current pixel color
+            const idx = pixelIdx * 4;
+            const r = imageData[idx];
+            const g = imageData[idx + 1];
+            const b = imageData[idx + 2];
+
+            // Check if color is within tolerance
+            const diff = Math.abs(r - startR) + Math.abs(g - startG) + Math.abs(b - startB);
+
+            if (diff <= tolerance * 3) {
+                selected[pixelIdx] = 1;
+
+                // Add neighbors
+                stack.push([x + 1, y]);
+                stack.push([x - 1, y]);
+                stack.push([x, y + 1]);
+                stack.push([x, y - 1]);
+            }
+        }
+
+        return selected;
+    }
+
+    function applyFloodFill(x, y) {
+        const selected = floodFill(x, y, state.fillTolerance);
+
+        // Merge with existing selection
+        for (let i = 0; i < selected.length; i++) {
+            if (selected[i]) {
+                state.selectionMask[i] = 1;
+            }
+        }
+
+        // Apply edge smoothing and render
+        renderSelectionWithSmoothing();
+
+        // Hide hint
         elements.selectionHint.classList.add('hidden');
     }
 
-    function updateMask(cx, cy, size, add) {
-        const radius = size / 2;
-        const startX = Math.max(0, Math.floor(cx - radius));
-        const endX = Math.min(state.imageWidth, Math.ceil(cx + radius));
-        const startY = Math.max(0, Math.floor(cy - radius));
-        const endY = Math.min(state.imageHeight, Math.ceil(cy + radius));
+    function eraseFloodFill(x, y) {
+        const selected = floodFill(x, y, state.fillTolerance);
 
-        for (let y = startY; y < endY; y++) {
-            for (let x = startX; x < endX; x++) {
-                const dx = x - cx;
-                const dy = y - cy;
-                if (dx * dx + dy * dy <= radius * radius) {
-                    const idx = (y * state.imageWidth + x) * 4;
-                    state.selectionMask.data[idx + 3] = add ? 255 : 0;
+        // Remove from existing selection
+        for (let i = 0; i < selected.length; i++) {
+            if (selected[i]) {
+                state.selectionMask[i] = 0;
+            }
+        }
+
+        // Render updated selection
+        renderSelectionWithSmoothing();
+    }
+
+    // ==========================================
+    // Edge Smoothing
+    // ==========================================
+    function renderSelectionWithSmoothing() {
+        const width = state.imageWidth;
+        const height = state.imageHeight;
+
+        // Clear selection canvas
+        selectionCtx.clearRect(0, 0, width, height);
+
+        // Create image data for the selection overlay
+        const selectionImageData = selectionCtx.createImageData(width, height);
+        const data = selectionImageData.data;
+
+        // Apply gaussian-like edge smoothing
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
+
+                if (state.selectionMask[idx]) {
+                    // Check neighbors for edge detection and anti-aliasing
+                    let edgeCount = 0;
+                    const neighbors = [
+                        [-1, -1], [0, -1], [1, -1],
+                        [-1, 0],          [1, 0],
+                        [-1, 1],  [0, 1],  [1, 1]
+                    ];
+
+                    for (const [dx, dy] of neighbors) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const nIdx = ny * width + nx;
+                            if (!state.selectionMask[nIdx]) {
+                                edgeCount++;
+                            }
+                        } else {
+                            edgeCount++;
+                        }
+                    }
+
+                    // Calculate alpha based on edge proximity
+                    let alpha;
+                    if (edgeCount === 0) {
+                        alpha = 128; // Fully inside
+                    } else if (edgeCount <= 2) {
+                        alpha = 100; // Near edge
+                    } else if (edgeCount <= 4) {
+                        alpha = 70; // On edge
+                    } else {
+                        alpha = 50; // Corner/very edge
+                    }
+
+                    const pixelIdx = idx * 4;
+                    data[pixelIdx] = 0;      // R (teal)
+                    data[pixelIdx + 1] = 165; // G
+                    data[pixelIdx + 2] = 168; // B
+                    data[pixelIdx + 3] = alpha;
                 }
             }
         }
+
+        selectionCtx.putImageData(selectionImageData, 0, 0);
+    }
+
+    // ==========================================
+    // Brush Tools (legacy support)
+    // ==========================================
+    function paintSelection(x, y) {
+        if (state.currentTool === 'fill') {
+            applyFloodFill(x, y);
+            return;
+        }
+
+        const size = state.brushSize;
+        const halfSize = size / 2;
+        const width = state.imageWidth;
+        const height = state.imageHeight;
+
+        const isErase = state.currentTool === 'erase';
+
+        // Update mask
+        const startX = Math.max(0, Math.floor(x - halfSize));
+        const endX = Math.min(width, Math.ceil(x + halfSize));
+        const startY = Math.max(0, Math.floor(y - halfSize));
+        const endY = Math.min(height, Math.ceil(y + halfSize));
+
+        for (let py = startY; py < endY; py++) {
+            for (let px = startX; px < endX; px++) {
+                const dx = px - x;
+                const dy = py - y;
+                if (dx * dx + dy * dy <= halfSize * halfSize) {
+                    const idx = py * width + px;
+                    state.selectionMask[idx] = isErase ? 0 : 1;
+                }
+            }
+        }
+
+        // Render with smoothing
+        renderSelectionWithSmoothing();
+
+        // Hide hint
+        elements.selectionHint.classList.add('hidden');
     }
 
     function clearSelection() {
+        state.selectionMask = new Uint8Array(state.imageWidth * state.imageHeight);
         selectionCtx.clearRect(0, 0, state.imageWidth, state.imageHeight);
-        state.selectionMask = selectionCtx.createImageData(state.imageWidth, state.imageHeight);
         elements.selectionHint.classList.remove('hidden');
-    }
-
-    function autoDetectRoof() {
-        // Simple edge-based roof detection (basic implementation)
-        // For production, you'd want to use a proper ML model
-
-        alert('Auto-detect is a preview feature. For best results, please manually paint over the roof area.\n\nTip: Use a large brush size for faster selection!');
-
-        // Basic sky detection - find top portion that's lighter
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = state.imageWidth;
-        tempCanvas.height = state.imageHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(state.originalImage, 0, 0, state.imageWidth, state.imageHeight);
-
-        const imageData = tempCtx.getImageData(0, 0, state.imageWidth, state.imageHeight);
-        const data = imageData.data;
-
-        // Simple heuristic: assume roof is in upper-middle portion
-        // and has different color from sky (which is usually lighter/bluer)
-
-        const roofStartY = Math.floor(state.imageHeight * 0.1);
-        const roofEndY = Math.floor(state.imageHeight * 0.5);
-
-        selectionCtx.fillStyle = 'rgba(0, 165, 168, 0.5)';
-
-        for (let y = roofStartY; y < roofEndY; y++) {
-            for (let x = 0; x < state.imageWidth; x++) {
-                const idx = (y * state.imageWidth + x) * 4;
-                const r = data[idx];
-                const g = data[idx + 1];
-                const b = data[idx + 2];
-
-                // Check if pixel is darker (likely roof, not sky)
-                const brightness = (r + g + b) / 3;
-                const isSky = brightness > 180 && b > r && b > g;
-
-                if (!isSky && brightness < 200) {
-                    selectionCtx.fillRect(x, y, 1, 1);
-                    state.selectionMask.data[idx + 3] = 255;
-                }
-            }
-        }
-
-        elements.selectionHint.classList.add('hidden');
     }
 
     // ==========================================
@@ -341,9 +460,6 @@
         // Draw original image
         previewCtx.drawImage(state.originalImage, 0, 0, width, height);
 
-        // Get the selection mask from selection canvas
-        const selectionData = selectionCtx.getImageData(0, 0, width, height);
-
         // Create shingle texture
         const textureCanvas = document.createElement('canvas');
         textureCanvas.width = width;
@@ -356,29 +472,44 @@
         const textureData = textureCtx.getImageData(0, 0, width, height);
 
         // Blend texture into selected areas
-        for (let i = 0; i < originalData.data.length; i += 4) {
-            const alpha = selectionData.data[i + 3] / 255; // Selection opacity
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const maskIdx = y * width + x;
+                const pixelIdx = maskIdx * 4;
 
-            if (alpha > 0) {
-                // Get original pixel brightness for lighting preservation
-                const origR = originalData.data[i];
-                const origG = originalData.data[i + 1];
-                const origB = originalData.data[i + 2];
-                const origBrightness = (origR + origG + origB) / 3 / 255;
+                if (state.selectionMask[maskIdx]) {
+                    // Get original pixel brightness for lighting preservation
+                    const origR = originalData.data[pixelIdx];
+                    const origG = originalData.data[pixelIdx + 1];
+                    const origB = originalData.data[pixelIdx + 2];
+                    const origBrightness = (origR + origG + origB) / 3 / 255;
 
-                // Get texture pixel
-                const texR = textureData.data[i];
-                const texG = textureData.data[i + 1];
-                const texB = textureData.data[i + 2];
+                    // Get texture pixel
+                    const texR = textureData.data[pixelIdx];
+                    const texG = textureData.data[pixelIdx + 1];
+                    const texB = textureData.data[pixelIdx + 2];
 
-                // Apply brightness from original image to texture
-                const brightnessFactor = 0.3 + origBrightness * 0.7;
+                    // Apply brightness from original image to texture
+                    const brightnessFactor = 0.3 + origBrightness * 0.7;
 
-                // Blend with alpha
-                const blendAlpha = alpha * 0.85; // Slightly transparent for realism
-                originalData.data[i] = Math.round(origR * (1 - blendAlpha) + texR * brightnessFactor * blendAlpha);
-                originalData.data[i + 1] = Math.round(origG * (1 - blendAlpha) + texG * brightnessFactor * blendAlpha);
-                originalData.data[i + 2] = Math.round(origB * (1 - blendAlpha) + texB * brightnessFactor * blendAlpha);
+                    // Check for edge - softer blend at edges
+                    let blendAlpha = 0.88;
+
+                    // Simple edge detection for smoother blending
+                    let isEdge = false;
+                    if (x > 0 && !state.selectionMask[maskIdx - 1]) isEdge = true;
+                    if (x < width - 1 && !state.selectionMask[maskIdx + 1]) isEdge = true;
+                    if (y > 0 && !state.selectionMask[maskIdx - width]) isEdge = true;
+                    if (y < height - 1 && !state.selectionMask[maskIdx + width]) isEdge = true;
+
+                    if (isEdge) {
+                        blendAlpha = 0.7; // Softer at edges
+                    }
+
+                    originalData.data[pixelIdx] = Math.round(origR * (1 - blendAlpha) + texR * brightnessFactor * blendAlpha);
+                    originalData.data[pixelIdx + 1] = Math.round(origG * (1 - blendAlpha) + texG * brightnessFactor * blendAlpha);
+                    originalData.data[pixelIdx + 2] = Math.round(origB * (1 - blendAlpha) + texB * brightnessFactor * blendAlpha);
+                }
             }
         }
 
@@ -482,6 +613,7 @@
     function startOver() {
         // Reset state
         state.originalImage = null;
+        state.originalImageData = null;
         state.selectionMask = null;
         state.selectedShingle = null;
 
@@ -531,19 +663,24 @@
             }
         });
 
-        // Selection canvas drawing
+        // Selection canvas - handle both click (fill) and drag (brush)
         elements.selectionCanvas.addEventListener('mousedown', (e) => {
-            state.isDrawing = true;
             const rect = elements.selectionCanvas.getBoundingClientRect();
             const scaleX = elements.selectionCanvas.width / rect.width;
             const scaleY = elements.selectionCanvas.height / rect.height;
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
-            paintSelection(x, y);
+
+            if (state.currentTool === 'fill') {
+                applyFloodFill(x, y);
+            } else {
+                state.isDrawing = true;
+                paintSelection(x, y);
+            }
         });
 
         elements.selectionCanvas.addEventListener('mousemove', (e) => {
-            if (!state.isDrawing) return;
+            if (!state.isDrawing || state.currentTool === 'fill') return;
             const rect = elements.selectionCanvas.getBoundingClientRect();
             const scaleX = elements.selectionCanvas.width / rect.width;
             const scaleY = elements.selectionCanvas.height / rect.height;
@@ -559,19 +696,24 @@
         // Touch support for mobile
         elements.selectionCanvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            state.isDrawing = true;
             const touch = e.touches[0];
             const rect = elements.selectionCanvas.getBoundingClientRect();
             const scaleX = elements.selectionCanvas.width / rect.width;
             const scaleY = elements.selectionCanvas.height / rect.height;
             const x = (touch.clientX - rect.left) * scaleX;
             const y = (touch.clientY - rect.top) * scaleY;
-            paintSelection(x, y);
+
+            if (state.currentTool === 'fill') {
+                applyFloodFill(x, y);
+            } else {
+                state.isDrawing = true;
+                paintSelection(x, y);
+            }
         });
 
         elements.selectionCanvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if (!state.isDrawing) return;
+            if (!state.isDrawing || state.currentTool === 'fill') return;
             const touch = e.touches[0];
             const rect = elements.selectionCanvas.getBoundingClientRect();
             const scaleX = elements.selectionCanvas.width / rect.width;
@@ -590,33 +732,34 @@
             btn.addEventListener('click', () => setTool(btn.dataset.tool));
         });
 
-        elements.brushSize.addEventListener('input', (e) => {
-            state.brushSize = parseInt(e.target.value);
-            elements.brushSizeValue.textContent = state.brushSize;
-        });
+        // Tolerance slider
+        if (elements.fillTolerance) {
+            elements.fillTolerance.addEventListener('input', (e) => {
+                state.fillTolerance = parseInt(e.target.value);
+                elements.fillToleranceValue.textContent = state.fillTolerance;
+            });
+        }
+
+        // Brush size slider
+        if (elements.brushSize) {
+            elements.brushSize.addEventListener('input', (e) => {
+                state.brushSize = parseInt(e.target.value);
+                elements.brushSizeValue.textContent = state.brushSize;
+            });
+        }
 
         elements.clearSelection.addEventListener('click', clearSelection);
-        elements.autoDetect.addEventListener('click', autoDetectRoof);
 
         // Navigation
         elements.backToUpload.addEventListener('click', () => goToStep('upload'));
         elements.proceedToShingles.addEventListener('click', () => {
             // Check if any selection made
             const hasSelection = state.selectionMask &&
-                Array.from(state.selectionMask.data).some((v, i) => i % 4 === 3 && v > 0);
+                state.selectionMask.some(v => v === 1);
 
             if (!hasSelection) {
-                // Check canvas for any paint
-                const selectionData = selectionCtx.getImageData(0, 0, state.imageWidth, state.imageHeight);
-                const hasCanvasSelection = Array.from(selectionData.data).some((v, i) => i % 4 === 3 && v > 0);
-
-                if (!hasCanvasSelection) {
-                    alert('Please select a roof area first by painting over it.');
-                    return;
-                }
-
-                // Update mask from canvas
-                state.selectionMask = selectionData;
+                alert('Please select a roof area first by clicking on it.');
+                return;
             }
 
             goToStep('shingles');
@@ -677,6 +820,10 @@
     function init() {
         setupEventListeners();
         renderColorGrid();
+
+        // Set default tool to fill
+        setTool('fill');
+
         console.log('Valiant Roofing Shingle Visualizer initialized');
     }
 

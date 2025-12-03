@@ -53,12 +53,20 @@
                 <h2>Select the Roof Area</h2>
             </div>
             <div class="toolbar">
-                <button class="tool-btn active" data-tool="draw" title="Draw Selection">
+                <button class="tool-btn active" data-tool="fill" title="Click to Fill - Select roof sections with one click">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    Click Fill
+                </button>
+                <button class="tool-btn" data-tool="draw" title="Draw Selection">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 19l7-7 3 3-7 7-3-3z"/>
                         <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
                     </svg>
-                    Draw
+                    Brush
                 </button>
                 <button class="tool-btn" data-tool="erase" title="Erase Selection">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -67,7 +75,12 @@
                     </svg>
                     Erase
                 </button>
-                <div class="brush-size">
+                <div class="tool-options" id="fillOptions">
+                    <label>Tolerance:</label>
+                    <input type="range" id="fillTolerance" min="5" max="80" value="32">
+                    <span id="fillToleranceValue">32</span>
+                </div>
+                <div class="tool-options" id="brushOptions" style="display: none;">
                     <label>Brush Size:</label>
                     <input type="range" id="brushSize" min="5" max="100" value="30">
                     <span id="brushSizeValue">30</span>
@@ -80,20 +93,12 @@
                     </svg>
                     Clear
                 </button>
-                <button class="tool-btn" id="autoDetect" title="AI Auto-Detect (Beta)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 16v-4"/>
-                        <path d="M12 8h.01"/>
-                    </svg>
-                    Auto-Detect
-                </button>
             </div>
             <div class="canvas-container">
                 <canvas id="mainCanvas"></canvas>
                 <canvas id="selectionCanvas"></canvas>
                 <div class="selection-hint" id="selectionHint">
-                    <p>Paint over the roof area you want to change</p>
+                    <p>Click on the roof sections to select them</p>
                 </div>
             </div>
             <div class="step-actions">
