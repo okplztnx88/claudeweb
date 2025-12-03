@@ -186,10 +186,23 @@
     function floodFill(startX, startY, tolerance) {
         const width = state.imageWidth;
         const height = state.imageHeight;
+
+        // Safety checks
+        if (!state.originalImageData || !state.originalImageData.data) {
+            console.error('No image data available for flood fill');
+            return new Uint8Array(width * height);
+        }
+
         const imageData = state.originalImageData.data;
 
         startX = Math.floor(startX);
         startY = Math.floor(startY);
+
+        // Bounds check for starting point
+        if (startX < 0 || startX >= width || startY < 0 || startY >= height) {
+            console.error('Start position out of bounds:', startX, startY);
+            return new Uint8Array(width * height);
+        }
 
         // Get the color at the starting point
         const startIdx = (startY * width + startX) * 4;
@@ -201,8 +214,9 @@
         const visited = new Uint8Array(width * height);
         const selected = new Uint8Array(width * height);
 
-        // Stack-based flood fill (faster than recursion)
+        // Use a more efficient scanline flood fill
         const stack = [[startX, startY]];
+        const toleranceThreshold = tolerance * 3;
 
         while (stack.length > 0) {
             const [x, y] = stack.pop();
@@ -225,10 +239,10 @@
             // Check if color is within tolerance
             const diff = Math.abs(r - startR) + Math.abs(g - startG) + Math.abs(b - startB);
 
-            if (diff <= tolerance * 3) {
+            if (diff <= toleranceThreshold) {
                 selected[pixelIdx] = 1;
 
-                // Add neighbors
+                // Add neighbors (4-directional)
                 stack.push([x + 1, y]);
                 stack.push([x - 1, y]);
                 stack.push([x, y + 1]);
@@ -240,14 +254,27 @@
     }
 
     function applyFloodFill(x, y) {
+        // Safety check
+        if (!state.originalImageData) {
+            console.error('Cannot flood fill: no image data');
+            alert('Please upload an image first');
+            return;
+        }
+
         const selected = floodFill(x, y, state.fillTolerance);
+
+        // Count selected pixels
+        let count = 0;
 
         // Merge with existing selection
         for (let i = 0; i < selected.length; i++) {
             if (selected[i]) {
                 state.selectionMask[i] = 1;
+                count++;
             }
         }
+
+        console.log('Flood fill selected', count, 'pixels at', Math.floor(x), Math.floor(y));
 
         // Apply edge smoothing and render
         renderSelectionWithSmoothing();
@@ -671,12 +698,28 @@
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
 
+            console.log('Mouse click at', x, y, 'tool:', state.currentTool);
+
             if (state.currentTool === 'fill') {
                 applyFloodFill(x, y);
             } else {
                 state.isDrawing = true;
                 paintSelection(x, y);
             }
+        });
+
+        // Also handle click for fill tool (in case mousedown doesn't fire properly)
+        elements.selectionCanvas.addEventListener('click', (e) => {
+            if (state.currentTool !== 'fill') return;
+
+            const rect = elements.selectionCanvas.getBoundingClientRect();
+            const scaleX = elements.selectionCanvas.width / rect.width;
+            const scaleY = elements.selectionCanvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            console.log('Click event at', x, y);
+            // Don't double-fire if mousedown already handled it
         });
 
         elements.selectionCanvas.addEventListener('mousemove', (e) => {
