@@ -326,11 +326,19 @@ body {
     height: auto;
 }
 
+#mainCanvas {
+    position: relative;
+    z-index: 1;
+}
+
 #selectionCanvas {
     position: absolute;
     top: 0;
     left: 0;
+    width: 100%;
+    height: 100%;
     cursor: crosshair;
+    z-index: 2;
 }
 
 #selectionCanvas.fill-mode {
