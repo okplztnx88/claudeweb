@@ -1,0 +1,17 @@
+{
+  "name": "genesis-world-generator",
+  "version": "1.0.0",
+  "description": "Deep procedural world generator with rich lore, cultures, and history",
+  "type": "module",
+  "scripts": {
+    "generate": "node src/generate.js",
+    "view": "node src/viewer.js",
+    "build": "node src/build-static.js"
+  },
+  "dependencies": {
+    "seedrandom": "^3.0.5"
+  },
+  "devDependencies": {
+    "@types/seedrandom": "^3.0.8"
+  }
+}
